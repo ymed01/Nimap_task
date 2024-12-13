@@ -4,8 +4,9 @@ from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from .models import Client, Project
-from .serializers import ClientSerializer, ProjectSerializer
+from .serializers import ClientSerializer, ProjectSerializer , ProjectForUserSerializer , ClientDetailSerializer, ClientDetailUpdateSerializer
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 @api_view(['GET', 'POST'])
@@ -32,14 +33,17 @@ def client_detail(request, id):
         return Response({'detail': 'Client not found'}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        serializer = ClientSerializer(client)
+        serializer = ClientDetailSerializer(client)
         return Response(serializer.data)
+    
     elif request.method in ['PUT', 'PATCH']:
-        serializer = ClientSerializer(client, data=request.data, partial=True)
+        # Pass the updated fields and the current timestamp for updated_at
+        serializer = ClientDetailUpdateSerializer(client, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save(updated_at=request.user)
-            return Response(serializer.data)
+            updated_client = serializer.save()  # Save the updated client data
+            return Response(ClientDetailUpdateSerializer(updated_client).data)  # Return the updated data
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
     elif request.method == 'DELETE':
         client.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -73,5 +77,8 @@ def project_create(request, client_id):
 @permission_classes([permissions.IsAuthenticated])
 def user_projects(request):
     projects = request.user.projects.all()
-    serializer = ProjectSerializer(projects, many=True)
+    # custom_fields = ['id', 'project_name', 'created_at', 'created_by']
+    # serializer = ProjectSerializer(projects, many=True, fields=custom_fields)
+    #serializer = ProjectSerializer(projects, many=True)
+    serializer = ProjectForUserSerializer(projects, many=True)
     return Response(serializer.data)
